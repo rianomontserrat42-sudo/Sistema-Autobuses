@@ -105,11 +105,16 @@
   const asientoOriginal = {{ boleto.asiento if boleto else 'null' }};
   async function cargar(inicial) {
     campo.value = ''; texto.textContent = 'Selecciona un asiento.';
+    botones.forEach(b => b.classList.remove('sel'));
+    if (!selRuta.value) {
+      botones.forEach(b => { b.classList.remove('ocu'); b.disabled = true; });
+      texto.textContent = 'Elige una ruta para ver los asientos de su autobús.';
+      return;
+    }
     const q = editandoId ? '?excluir=' + editandoId : '';
-    const r = await fetch('/ocupados/' + fecha.value + q);
+    const r = await fetch('/ocupados/' + fecha.value + '/' + encodeURIComponent(selRuta.value) + q);
     const ocupados = (await r.json()).map(String);
     botones.forEach(b => {
-      b.classList.remove('sel');
       b.classList.toggle('ocu', ocupados.includes(b.dataset.n));
       b.disabled = ocupados.includes(b.dataset.n);
     });
@@ -120,6 +125,7 @@
   }
   botones.forEach(b => b.addEventListener('click', () => { if (!b.disabled) elegir(b); }));
   fecha.addEventListener('change', () => cargar(false));
+  selRuta.addEventListener('change', () => cargar(false));
   const nombre = document.getElementById('nombre');
   nombre.addEventListener('input', () => {
     nombre.value = nombre.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]/g, '');

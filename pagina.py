@@ -49,16 +49,16 @@ def vender():
             flash(f"Boleto vendido a {parada} ({ruta}) ${precio}: asiento {int(asiento):02d} para {nombre}.", "ok")
             return redirect(url_for("vender"))
         else:
-            flash("Ese asiento ya está ocupado en esa fecha.", "error")
+            flash("Ese asiento ya está ocupado en el autobús de esa ruta y fecha.", "error")
     return render_template("vender.html", filas=FILAS, hoy=date.today().isoformat(),
                            rutas=RUTAS, origen=ORIGEN, destino_sel=request.form.get("destino", ""))
 
 
-@app.route("/ocupados/<fecha>")
-def ocupados(fecha):
-    if not validar_fecha(fecha):
+@app.route("/ocupados/<fecha>/<ruta>")
+def ocupados(fecha, ruta):
+    if not validar_fecha(fecha) or ruta not in RUTAS:
         return jsonify([])
-    return jsonify(basedatos.asientos_ocupados(fecha, request.args.get("excluir", type=int)))
+    return jsonify(basedatos.asientos_ocupados(fecha, ruta, request.args.get("excluir", type=int)))
 
 
 @app.route("/editar/<int:boleto_id>", methods=["GET", "POST"])
@@ -84,7 +84,7 @@ def editar(boleto_id):
             flash("Pasajero actualizado.", "ok")
             return redirect(url_for("boletos"))
         else:
-            flash("Ese asiento ya está ocupado en esa fecha.", "error")
+            flash("Ese asiento ya está ocupado en el autobús de esa ruta y fecha.", "error")
     return render_template("vender.html", filas=FILAS, hoy=date.today().isoformat(), boleto=boleto,
                            rutas=RUTAS, origen=ORIGEN, destino_sel=f"{boleto['ruta']}|{boleto['destino']}")
 

@@ -41,18 +41,17 @@ def iniciar():
                 nombre TEXT NOT NULL,
                 fecha TEXT NOT NULL,
                 asiento INTEGER NOT NULL,
-                UNIQUE (fecha, asiento)
+                destino TEXT,
+                precio INTEGER,
+                vendido TEXT,
+                ruta TEXT,
+                UNIQUE (fecha, ruta, asiento)
             )"""
         )
         columnas = {c["name"] for c in con.execute("PRAGMA table_info(boletos)")}
-        if "destino" not in columnas:
-            con.execute("ALTER TABLE boletos ADD COLUMN destino TEXT")
-        if "precio" not in columnas:
-            con.execute("ALTER TABLE boletos ADD COLUMN precio INTEGER")
-        if "vendido" not in columnas:
-            con.execute("ALTER TABLE boletos ADD COLUMN vendido TEXT")
-        if "ruta" not in columnas:
-            con.execute("ALTER TABLE boletos ADD COLUMN ruta TEXT")
+        for col, tipo in (("destino", "TEXT"), ("precio", "INTEGER"), ("vendido", "TEXT"), ("ruta", "TEXT")):
+            if col not in columnas:
+                con.execute(f"ALTER TABLE boletos ADD COLUMN {col} {tipo}")
         con.execute(
             "UPDATE boletos SET destino = ? WHERE destino IS NULL", (RUTA_POR_DEFECTO,)
         )
@@ -66,13 +65,44 @@ def iniciar():
         # Boletos anteriores: Yolo pertenece a la ruta de Tlaxiaco; los demás usan su destino como ruta
         con.execute("UPDATE boletos SET ruta = 'Tlaxiaco' WHERE ruta IS NULL AND destino = 'Yolo'")
         con.execute("UPDATE boletos SET ruta = destino WHERE ruta IS NULL")
+        _migrar_unicidad_por_ruta(con)
 
 
-def asientos_ocupados(fecha, excluir_id=None):
+def _migrar_unicidad_por_ruta(con):
+    """Cada ruta tiene su propio autobús: el asiento es único por fecha y ruta."""
+    indices = [
+        [c["name"] for c in con.execute(f"PRAGMA index_info('{i['name']}')")]
+        for i in con.execute("PRAGMA index_list(boletos)")
+        if i["unique"]
+    ]
+    if ["fecha", "ruta", "asiento"] in indices:
+        return
+    con.execute(
+        """CREATE TABLE boletos_nueva (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            fecha TEXT NOT NULL,
+            asiento INTEGER NOT NULL,
+            destino TEXT,
+            precio INTEGER,
+            vendido TEXT,
+            ruta TEXT,
+            UNIQUE (fecha, ruta, asiento)
+        )"""
+    )
+    con.execute(
+        "INSERT INTO boletos_nueva (id, nombre, fecha, asiento, destino, precio, vendido, ruta)"
+        " SELECT id, nombre, fecha, asiento, destino, precio, vendido, ruta FROM boletos"
+    )
+    con.execute("DROP TABLE boletos")
+    con.execute("ALTER TABLE boletos_nueva RENAME TO boletos")
+
+
+def asientos_ocupados(fecha, ruta, excluir_id=None):
     with conectar() as con:
         filas = con.execute(
-            "SELECT asiento FROM boletos WHERE fecha = ? AND id IS NOT ?",
-            (fecha, excluir_id),
+            "SELECT asiento FROM boletos WHERE fecha = ? AND ruta = ? AND id IS NOT ?",
+            (fecha, ruta, excluir_id),
         )
         return [f["asiento"] for f in filas]
 
