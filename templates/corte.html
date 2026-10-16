@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block titulo %}Corte de caja{% endblock %}
+{% block contenido %}
+<style>
+  .filtros { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px; }
+  .filtros label { font-weight:600; font-size:.9rem; display:block; margin-bottom:4px; }
+  .filtros input, .filtros select { padding:9px; border:1px solid #cdd2e4; border-radius:8px; font-size:1rem; }
+  tfoot td { background:#2f63c7 !important; color:#fff; font-weight:700; }
+  td.num, th.num { text-align:right; }
+</style>
+
+{% macro tabla(datos) %}
+<table>
+  <thead><tr><th>Ruta</th><th class="num">Boletos</th><th class="num">Total</th></tr></thead>
+  <tbody>
+    {% for d in datos[0] %}
+    <tr><td>{{ origen }} → {{ d.destino }}</td><td class="num">{{ d.boletos }}</td><td class="num">${{ d.total }}</td></tr>
+    {% endfor %}
+  </tbody>
+  <tfoot><tr><td>TOTAL</td><td class="num">{{ datos[1] }}</td><td class="num">${{ datos[2] }}</td></tr></tfoot>
+</table>
+{% endmacro %}
+
+<div class="card">
+  <h2>Corte de caja del día</h2>
+  <form method="get" class="filtros">
+    <input type="hidden" name="desde" value="{{ desde }}">
+    <input type="hidden" name="hasta" value="{{ hasta }}">
+    <input type="hidden" name="base" value="{{ campo }}">
+    <div><label for="dia">Día (boletos vendidos ese día)</label><input id="dia" type="date" name="dia" value="{{ dia }}"></div>
+    <button class="btn" type="submit">Ver corte</button>
+  </form>
+  {{ tabla(corte_dia) }}
+</div>
+
+<div class="card">
+  <h2>Corte de periodo</h2>
+  <form method="get" class="filtros">
+    <input type="hidden" name="dia" value="{{ dia }}">
+    <div><label for="desde">Desde</label><input id="desde" type="date" name="desde" value="{{ desde }}"></div>
+    <div><label for="hasta">Hasta</label><input id="hasta" type="date" name="hasta" value="{{ hasta }}"></div>
+    <div><label for="base">Contar por</label>
+      <select id="base" name="base">
+        {% for k, v in campos.items() %}<option value="{{ k }}" {{ 'selected' if k == campo }}>{{ v|capitalize }}</option>{% endfor %}
+      </select></div>
+    <button class="btn" type="submit">Ver corte</button>
+  </form>
+  {{ tabla(corte_periodo) }}
+</div>
+{% endblock %}

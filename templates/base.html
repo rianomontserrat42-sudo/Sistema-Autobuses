@@ -33,6 +33,7 @@
   <a href="{{ url_for('index') }}" class="{{ 'activo' if request.endpoint=='index' }}">Inicio</a>
   <a href="{{ url_for('vender') }}" class="{{ 'activo' if request.endpoint=='vender' }}">Vender boletos</a>
   <a href="{{ url_for('boletos') }}" class="{{ 'activo' if request.endpoint=='boletos' }}">Boletos vendidos</a>
+  {% if corte_activo %}<a href="{{ url_for('corte') }}" class="{{ 'activo' if request.endpoint=='corte' }}">Corte de caja</a>{% endif %}
 </nav>
 <main>
   {% for cat, m in get_flashed_messages(with_categories=true) %}<div class="msg {{ cat }}">{{ m }}</div>{% endfor %}

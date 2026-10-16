@@ -15,7 +15,8 @@
   .vacio { width:54px; height:54px; }
   .leyenda .asiento { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; cursor:default; font-size:.75rem; }
   label { display:block; margin:12px 0 4px; font-weight:600; }
-  input { padding:10px; border:1px solid #cdd2e4; border-radius:8px; width:100%; box-sizing:border-box; }
+  input, select { padding:10px; border:1px solid #cdd2e4; border-radius:8px; width:100%; box-sizing:border-box; font-size:1rem; background:#fff; }
+  input:disabled { background:#eef0f7; color:#6b7490; }
 </style>
 <form method="post" id="form">
   <div class="card">
@@ -23,6 +24,17 @@
     <input id="nombre" name="nombre" required minlength="2" maxlength="80"     autocomplete="off" value="{{ boleto.nombre if boleto else '' }}"
            pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+( [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*" title="Solo letras y espacios">
     <small style="color:#6b7490">Solo letras, sin números ni símbolos.</small>
+    <label for="origen">Punto de partida</label>
+    <input id="origen" value="{{ origen }}" disabled>
+    <label for="ruta">Ruta</label>
+    <select id="ruta" required>
+      <option value="" disabled>Selecciona una ruta</option>
+      {% for ruta in rutas %}<option value="{{ ruta }}">Ruta {{ ruta }}</option>{% endfor %}
+    </select>
+    <label for="destino">Parada de destino</label>
+    <select id="destino" name="destino" required disabled>
+      <option value="">Primero elige una ruta</option>
+    </select>
     <label for="fecha">Fecha del viaje</label>
     <input id="fecha" name="fecha" type="date" min="{{ hoy }}" value="{{ boleto.fecha if boleto else hoy }}" required>
     <input type="hidden" name="asiento" id="asiento">
@@ -68,6 +80,28 @@
     texto.textContent = 'Asiento seleccionado: ' + b.textContent;
   }
   const editandoId = {{ boleto.id if boleto else 'null' }};
+  const RUTAS = {{ rutas|tojson }};
+  const selRuta = document.getElementById('ruta');
+  const selParada = document.getElementById('destino');
+  function llenarParadas(ruta, seleccionada) {
+    selParada.innerHTML = '';
+    if (!RUTAS[ruta]) {
+      selParada.add(new Option('Primero elige una ruta', ''));
+      selParada.disabled = true;
+      return;
+    }
+    selParada.add(new Option('Selecciona una parada', ''));
+    RUTAS[ruta].forEach(([parada, precio]) => {
+      const valor = ruta + '|' + parada;
+      selParada.add(new Option(parada + ' — $' + precio, valor, false, valor === seleccionada));
+    });
+    selParada.disabled = false;
+  }
+  selRuta.addEventListener('change', () => llenarParadas(selRuta.value, ''));
+  const destinoInicial = {{ destino_sel|tojson }};
+  const rutaInicial = destinoInicial.split('|')[0];
+  selRuta.value = RUTAS[rutaInicial] ? rutaInicial : '';
+  llenarParadas(selRuta.value, destinoInicial);
   const asientoOriginal = {{ boleto.asiento if boleto else 'null' }};
   async function cargar(inicial) {
     campo.value = ''; texto.textContent = 'Selecciona un asiento.';

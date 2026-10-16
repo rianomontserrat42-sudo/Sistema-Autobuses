@@ -4,10 +4,10 @@
 <div class="card">
   <h2>Boletos vendidos</h2>
   <table>
-    <thead><tr><th>Nombre</th><th>Fecha del viaje</th><th>Asiento</th><th>Acciones</th></tr></thead>
+    <thead><tr><th>Nombre</th><th>Ruta</th><th>Fecha del viaje</th><th>Asiento</th><th>Precio</th><th>Acciones</th></tr></thead>
     <tbody>
     {% for b in boletos %}
-    <tr><td>{{ b.nombre }}</td><td>{{ b.fecha }}</td><td><span class="asiento-tag">{{ '%02d'|format(b.asiento) }}</span></td>
+    <tr><td>{{ b.nombre }}</td><td>{{ origen }} → {{ b.destino }} <small style="color:#6b7490">(ruta {{ b.ruta }})</small></td><td>{{ b.fecha }}</td><td><span class="asiento-tag">{{ '%02d'|format(b.asiento) }}</span></td><td>${{ b.precio }}</td>
       <td style="white-space:nowrap">
         <a class="acc editar" href="{{ url_for('editar', boleto_id=b.id) }}">Editar</a>
         <form method="post" action="{{ url_for('borrar', boleto_id=b.id) }}" style="display:inline"
@@ -16,7 +16,7 @@
         </form>
       </td></tr>
     {% else %}
-    <tr><td colspan="4">Aún no hay boletos vendidos.</td></tr>
+    <tr><td colspan="6">Aún no hay boletos vendidos.</td></tr>
     {% endfor %}
     </tbody>
   </table>
