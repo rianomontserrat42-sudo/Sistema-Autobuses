@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Boletos vendidos{% endblock %}
+{% block contenido %}
+<div class="card">
+  <h2>Boletos vendidos</h2>
+  <table>
+    <thead><tr><th>Nombre</th><th>Fecha del viaje</th><th>Asiento</th><th>Acciones</th></tr></thead>
+    <tbody>
+    {% for b in boletos %}
+    <tr><td>{{ b.nombre }}</td><td>{{ b.fecha }}</td><td><span class="asiento-tag">{{ '%02d'|format(b.asiento) }}</span></td>
+      <td style="white-space:nowrap">
+        <a class="acc editar" href="{{ url_for('editar', boleto_id=b.id) }}">Editar</a>
+        <form method="post" action="{{ url_for('borrar', boleto_id=b.id) }}" style="display:inline"
+              onsubmit="return confirm('¿Eliminar a {{ b.nombre }} (asiento {{ b.asiento }})?')">
+          <button class="acc borrar" type="submit">Borrar</button>
+        </form>
+      </td></tr>
+    {% else %}
+    <tr><td colspan="4">Aún no hay boletos vendidos.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

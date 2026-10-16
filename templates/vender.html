@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block titulo %}Vender boletos{% endblock %}
+{% block contenido %}
+<style>
+  .leyenda { display:flex; gap:24px; align-items:center; }
+  .leyenda span { display:flex; align-items:center; gap:8px; }
+  .bus { width:300px; margin:0 auto; background:#f3f4fa; border:2px solid #e0e3f2; border-radius:36px; padding:20px 26px; }
+  .bus h4 { display:flex; justify-content:space-between; margin:0 0 12px; font-size:.8rem; color:#6b7490; letter-spacing:1px; border-bottom:2px dashed #e0e3f2; padding-bottom:10px; }
+  .fila { display:flex; justify-content:space-between; margin-bottom:12px; }
+  .par { display:flex; gap:10px; width:116px; }
+  .asiento { width:54px; height:54px; border:0; border-radius:14px 14px 10px 10px; color:#fff; font-weight:700;
+    background:linear-gradient(#3a72d8,#2557b8); box-shadow:0 8px 0 -2px #1b3f85; cursor:pointer; font-size:.95rem; }
+  .asiento.sel { background:linear-gradient(#3fdc78,#25b55a); box-shadow:0 8px 0 -2px #118a3d; }
+  .asiento.ocu { background:linear-gradient(#bfc4d2,#a9aebd); color:#7a8196; box-shadow:0 8px 0 -2px #9a9fae; cursor:not-allowed; }
+  .vacio { width:54px; height:54px; }
+  .leyenda .asiento { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; cursor:default; font-size:.75rem; }
+  label { display:block; margin:12px 0 4px; font-weight:600; }
+  input { padding:10px; border:1px solid #cdd2e4; border-radius:8px; width:100%; box-sizing:border-box; }
+</style>
+<form method="post" id="form">
+  <div class="card">
+    <label for="nombre">Nombre del pasajero</label>
+    <input id="nombre" name="nombre" required minlength="2" maxlength="80"     autocomplete="off" value="{{ boleto.nombre if boleto else '' }}"
+           pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+( [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*" title="Solo letras y espacios">
+    <small style="color:#6b7490">Solo letras, sin números ni símbolos.</small>
+    <label for="fecha">Fecha del viaje</label>
+    <input id="fecha" name="fecha" type="date" min="{{ hoy }}" value="{{ boleto.fecha if boleto else hoy }}" required>
+    <input type="hidden" name="asiento" id="asiento">
+  </div>
+  <div class="card leyenda">
+    <span><b class="asiento">01</b> Libre</span>
+    <span><b class="asiento sel">02</b> Seleccionado</span>
+    <span><b class="asiento ocu">03</b> Ocupado</span>
+  </div>
+  <div class="card">
+    <div class="bus">
+      <h4><span>PISO ÚNICO</span><span>ESCALERA</span></h4>
+      {% for izq, der in filas %}
+      <div class="fila">
+        {% for par in (izq, der) %}
+        <div class="par">
+          {% for n in par %}
+            {% if n %}<button type="button" class="asiento" data-n="{{ n }}">{{ '%02d'|format(n) }}</button>
+            {% else %}<span class="vacio"></span>{% endif %}
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <p id="elegido" style="text-align:center">Selecciona un asiento.</p>
+  <div style="text-align:center">
+    <button class="btn" type="submit">{{ 'Guardar cambios' if boleto else 'Vender boleto' }}</button>
+    {% if boleto %}<a class="btn" style="background:#8a93ad" href="{{ url_for('boletos') }}">Cancelar</a>{% endif %}
+  </div>
+</form>
+<script>
+  const fecha = document.getElementById('fecha');
+  const campo = document.getElementById('asiento');
+  const botones = document.querySelectorAll('.bus .asiento');
+  const texto = document.getElementById('elegido');
+
+  function elegir(b) {
+    botones.forEach(x => x.classList.remove('sel'));
+    b.classList.add('sel');
+    campo.value = b.dataset.n;
+    texto.textContent = 'Asiento seleccionado: ' + b.textContent;
+  }
+  const editandoId = {{ boleto.id if boleto else 'null' }};
+  const asientoOriginal = {{ boleto.asiento if boleto else 'null' }};
+  async function cargar(inicial) {
+    campo.value = ''; texto.textContent = 'Selecciona un asiento.';
+    const q = editandoId ? '?excluir=' + editandoId : '';
+    const r = await fetch('/ocupados/' + fecha.value + q);
+    const ocupados = (await r.json()).map(String);
+    botones.forEach(b => {
+      b.classList.remove('sel');
+      b.classList.toggle('ocu', ocupados.includes(b.dataset.n));
+      b.disabled = ocupados.includes(b.dataset.n);
+    });
+    if (inicial === true && asientoOriginal) {
+      const b = document.querySelector('.bus .asiento[data-n="' + asientoOriginal + '"]');
+      if (b && !b.disabled) elegir(b);
+    }
+  }
+  botones.forEach(b => b.addEventListener('click', () => { if (!b.disabled) elegir(b); }));
+  fecha.addEventListener('change', () => cargar(false));
+  const nombre = document.getElementById('nombre');
+  nombre.addEventListener('input', () => {
+    nombre.value = nombre.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]/g, '');
+  });
+  document.getElementById('form').addEventListener('submit', e => {
+    if (!campo.value) { e.preventDefault(); alert('Selecciona un asiento.'); }
+  });
+  cargar(true);
+</script>
+{% endblock %}

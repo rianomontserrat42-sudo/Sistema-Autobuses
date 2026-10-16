@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}Inicio{% endblock %}
+{% block contenido %}
+<div class="card" style="text-align:center">
+  <h1>¡Bienvenido!</h1>
+  <p>Autobús de 30 asientos.</p>
+  <a class="btn" href="{{ url_for('vender') }}">Vender boleto</a>
+  <a class="btn" href="{{ url_for('boletos') }}">Ver boletos</a>
+</div>
+{% endblock %}
