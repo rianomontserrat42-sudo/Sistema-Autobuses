@@ -13,12 +13,22 @@
 <table>
   <thead><tr><th>Ruta</th><th class="num">Boletos</th><th class="num">Total</th></tr></thead>
   <tbody>
-    {% for d in datos[0] %}
-    <tr><td>{{ origen }} → {{ d.destino }}</td><td class="num">{{ d.boletos }}</td><td class="num">${{ d.total }}</td></tr>
+    {% for d in datos.por_ruta %}
+    <tr><td>{{ origen }} → {{ d.ruta }}</td><td class="num">{{ d.boletos }}</td><td class="num">${{ d.total }}</td></tr>
+    {% else %}
+    <tr><td colspan="3">Sin boletos en este corte.</td></tr>
     {% endfor %}
   </tbody>
-  <tfoot><tr><td>TOTAL</td><td class="num">{{ datos[1] }}</td><td class="num">${{ datos[2] }}</td></tr></tfoot>
+  <tfoot><tr><td>TOTAL</td><td class="num">{{ datos.cantidad }}</td><td class="num">${{ datos.total }}</td></tr></tfoot>
 </table>
+{% endmacro %}
+
+{% macro selector_ruta() %}
+<div><label for="ruta">Ruta</label>
+  <select id="ruta" name="ruta">
+    <option value="">Todas</option>
+    {% for r in rutas %}<option value="{{ r }}" {{ 'selected' if r == ruta }}>{{ origen }} → {{ r }}</option>{% endfor %}
+  </select></div>
 {% endmacro %}
 
 <div class="card">
@@ -28,7 +38,9 @@
     <input type="hidden" name="hasta" value="{{ hasta }}">
     <input type="hidden" name="base" value="{{ campo }}">
     <div><label for="dia">Día (boletos vendidos ese día)</label><input id="dia" type="date" name="dia" value="{{ dia }}"></div>
+    {{ selector_ruta() }}
     <button class="btn" type="submit">Ver corte</button>
+    <a class="btn" href="{{ url_for('corte_pdf', tipo='dia', dia=dia, desde=desde, hasta=hasta, base=campo, ruta=ruta) }}">Exportar PDF</a>
   </form>
   {{ tabla(corte_dia) }}
 </div>
@@ -43,7 +55,9 @@
       <select id="base" name="base">
         {% for k, v in campos.items() %}<option value="{{ k }}" {{ 'selected' if k == campo }}>{{ v|capitalize }}</option>{% endfor %}
       </select></div>
+    {{ selector_ruta() }}
     <button class="btn" type="submit">Ver corte</button>
+    <a class="btn" href="{{ url_for('corte_pdf', tipo='periodo', dia=dia, desde=desde, hasta=hasta, base=campo, ruta=ruta) }}">Exportar PDF</a>
   </form>
   {{ tabla(corte_periodo) }}
 </div>

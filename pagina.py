@@ -1,6 +1,11 @@
+import io
 from datetime import date
 
-from flask import Flask, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Flask, abort, flash, jsonify, redirect, render_template, request, send_file, url_for
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 import basedatos
 from basedatos import CAMPOS_CORTE, ORIGEN, RUTAS, parsear_destino
@@ -10,8 +15,8 @@ app = Flask(__name__)
 app.secret_key = "autobus-local"
 basedatos.iniciar()
 
-# Cambiar a True para volver a mostrar el Corte de caja
-CORTE_ACTIVO = False
+# Cambiar a False para ocultar el Corte de caja
+CORTE_ACTIVO = True
 
 
 @app.context_processor
@@ -101,10 +106,8 @@ def boletos():
     return render_template("boletos.html", boletos=basedatos.listar(), origen=ORIGEN)
 
 
-@app.route("/corte")
-def corte():
-    if not CORTE_ACTIVO:
-        abort(404)
+def _parametros_corte():
+    """Lee y valida los filtros del corte (día, periodo, base y ruta)."""
     hoy = date.today().isoformat()
     dia = request.args.get("dia", hoy)
     if not validar_fecha(dia):
@@ -112,6 +115,9 @@ def corte():
     campo = request.args.get("base", "vendido")
     if campo not in CAMPOS_CORTE:
         campo = "vendido"
+    ruta = request.args.get("ruta", "")
+    if ruta not in RUTAS:
+        ruta = ""
     desde = request.args.get("desde", hoy[:8] + "01")
     hasta = request.args.get("hasta", hoy)
     if not (validar_fecha(desde) and validar_fecha(hasta)):
@@ -120,12 +126,70 @@ def corte():
     elif desde > hasta:
         flash("La fecha inicial no puede ser mayor que la final.", "error")
         desde, hasta = hasta, desde
+    return hoy, dia, desde, hasta, campo, ruta
+
+
+@app.route("/corte")
+def corte():
+    if not CORTE_ACTIVO:
+        abort(404)
+    hoy, dia, desde, hasta, campo, ruta = _parametros_corte()
     return render_template(
-        "corte.html", origen=ORIGEN, dia=dia, desde=desde, hasta=hasta,
-        campo=campo, campos=CAMPOS_CORTE, hoy=hoy,
-        corte_dia=basedatos.corte(dia, dia, "vendido"),
-        corte_periodo=basedatos.corte(desde, hasta, campo),
+        "corte.html", origen=ORIGEN, dia=dia, desde=desde, hasta=hasta, hoy=hoy,
+        campo=campo, campos=CAMPOS_CORTE, ruta=ruta, rutas=RUTAS,
+        corte_dia=basedatos.corte(dia, dia, "vendido", ruta),
+        corte_periodo=basedatos.corte(desde, hasta, campo, ruta),
     )
+
+
+@app.route("/corte/pdf")
+def corte_pdf():
+    if not CORTE_ACTIVO:
+        abort(404)
+    hoy, dia, desde, hasta, campo, ruta = _parametros_corte()
+    if request.args.get("tipo") == "dia":
+        titulo, ini, fin, base = f"Corte de caja del día {dia}", dia, dia, "vendido"
+    else:
+        titulo, ini, fin, base = f"Corte de caja del {desde} al {hasta}", desde, hasta, campo
+    datos = basedatos.corte(ini, fin, base, ruta)
+
+    est = getSampleStyleSheet()
+    estilo_tabla = TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#333333")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ALIGN", (-1, 1), (-1, -1), "RIGHT"),
+    ])
+    filtro_txt = f"Base: {CAMPOS_CORTE[base]} · " + (f"Ruta: {ruta}" if ruta else "Todas las rutas")
+    el = [Paragraph(f"Corte de caja — {ORIGEN}", est["Title"]),
+          Paragraph(titulo, est["Heading2"]),
+          Paragraph(filtro_txt, est["Normal"]), Spacer(1, 12)]
+
+    if not datos["boletos"]:
+        el.append(Paragraph("No hay boletos en este periodo.", est["Normal"]))
+    else:
+        resumen = [["Ruta", "Boletos", "Total"]]
+        resumen += [[r["ruta"], r["boletos"], f"${r['total']}"] for r in datos["por_ruta"]]
+        resumen.append(["TOTAL", datos["cantidad"], f"${datos['total']}"])
+        t1 = Table(resumen, hAlign="LEFT")
+        t1.setStyle(estilo_tabla)
+        t1.setStyle(TableStyle([("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold")]))
+        el += [Paragraph("Resumen por ruta", est["Heading3"]), t1, Spacer(1, 14),
+               Paragraph("Detalle de boletos", est["Heading3"])]
+        filas = [["Venta", "Viaje", "Pasajero", "Asiento", "Ruta", "Parada", "Precio"]]
+        filas += [[b["vendido"], b["fecha"], b["nombre"], f"{b['asiento']:02d}",
+                   b["ruta"], b["destino"], f"${b['precio']}"] for b in datos["boletos"]]
+        t2 = Table(filas, repeatRows=1)
+        t2.setStyle(estilo_tabla)
+        el.append(t2)
+
+    buffer = io.BytesIO()
+    SimpleDocTemplate(buffer, pagesize=letter, title=titulo, leftMargin=36, rightMargin=36,
+                      topMargin=36, bottomMargin=36).build(el)
+    buffer.seek(0)
+    return send_file(buffer, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"corte_{ini}_{fin}.pdf")
 
 
 if __name__ == "__main__":

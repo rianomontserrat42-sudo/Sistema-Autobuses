@@ -98,13 +98,29 @@ def _migrar_unicidad_por_ruta(con):
     con.execute("ALTER TABLE boletos_nueva RENAME TO boletos")
 
 
-def asientos_ocupados(fecha, ruta, excluir_id=None):
+def vender(nombre, fecha, asiento, ruta, destino, precio):
+    """Guarda un boleto. Devuelve False si el asiento ya está ocupado."""
+    try:
+        with conectar() as con:
+            con.execute(
+                "INSERT INTO boletos (nombre, fecha, asiento, destino, precio, vendido, ruta)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (nombre, fecha, asiento, destino, precio, date.today().isoformat(), ruta),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def asientos_ocupados(fecha, ruta, excluir=None):
+    """Lista de asientos ocupados en esa fecha y ruta (se puede excluir un boleto al editar)."""
+    sql = "SELECT asiento FROM boletos WHERE fecha = ? AND ruta = ?"
+    params = [fecha, ruta]
+    if excluir is not None:
+        sql += " AND id != ?"
+        params.append(excluir)
     with conectar() as con:
-        filas = con.execute(
-            "SELECT asiento FROM boletos WHERE fecha = ? AND ruta = ? AND id IS NOT ?",
-            (fecha, ruta, excluir_id),
-        )
-        return [f["asiento"] for f in filas]
+        return [f["asiento"] for f in con.execute(sql, params)]
 
 
 def obtener(boleto_id):
@@ -113,15 +129,9 @@ def obtener(boleto_id):
 
 
 def actualizar(boleto_id, nombre, fecha, asiento, ruta, destino, precio):
-    """Devuelve False si el asiento ya está ocupado en esa fecha."""
+    """Actualiza un boleto. Devuelve False si el asiento ya está ocupado."""
     try:
         with conectar() as con:
-            actual = con.execute(
-                "SELECT ruta, destino, precio FROM boletos WHERE id = ?", (boleto_id,)
-            ).fetchone()
-            # Si el destino no cambia se conserva el precio con que se vendió
-            if actual and (actual["ruta"], actual["destino"]) == (ruta, destino):
-                precio = actual["precio"]
             con.execute(
                 "UPDATE boletos SET nombre = ?, fecha = ?, asiento = ?, ruta = ?, destino = ?, precio = ?"
                 " WHERE id = ?",
@@ -137,41 +147,31 @@ def borrar(boleto_id):
         con.execute("DELETE FROM boletos WHERE id = ?", (boleto_id,))
 
 
-def vender(nombre, fecha, asiento, ruta, destino, precio):
-    """Devuelve False si el asiento ya está ocupado en esa fecha."""
-    try:
-        with conectar() as con:
-            con.execute(
-                "INSERT INTO boletos (nombre, fecha, asiento, ruta, destino, precio, vendido)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (nombre, fecha, asiento, ruta, destino, precio, date.today().isoformat()),
-            )
-        return True
-    except sqlite3.IntegrityError:
-        return False
-
-
 def listar():
     with conectar() as con:
-        return con.execute(
-            "SELECT id, nombre, fecha, asiento, ruta, destino, precio FROM boletos"
-            " ORDER BY fecha, asiento"
-        ).fetchall()
+        return con.execute("SELECT * FROM boletos ORDER BY fecha, ruta, asiento").fetchall()
 
 
-def corte(desde, hasta, campo="vendido"):
-    """Resumen por ruta y total entre dos fechas (inclusive)."""
-    if campo not in CAMPOS_CORTE:
+def corte(desde, hasta, campo="vendido", ruta=""):
+    """Corte de caja entre dos fechas. campo: 'vendido' (fecha de venta) o 'fecha' (fecha de viaje)."""
+    if campo not in CAMPOS_CORTE:  # lista blanca, por eso es seguro usarlo en el SQL
         campo = "vendido"
+    filtro = f"WHERE {campo} BETWEEN ? AND ?"
+    params = [desde, hasta]
+    if ruta in RUTAS:
+        filtro += " AND ruta = ?"
+        params.append(ruta)
     with conectar() as con:
-        filas = con.execute(
-            f"SELECT ruta, COUNT(*) AS boletos, SUM(precio) AS total FROM boletos"
-            f" WHERE {campo} BETWEEN ? AND ? GROUP BY ruta",
-            (desde, hasta),
-        ).fetchall()
-    por_ruta = {f["ruta"]: (f["boletos"], f["total"]) for f in filas}
-    detalle = [
-        {"destino": r, "boletos": por_ruta.get(r, (0, 0))[0], "total": por_ruta.get(r, (0, 0))[1]}
-        for r in RUTAS
-    ]
-    return detalle, sum(d["boletos"] for d in detalle), sum(d["total"] for d in detalle)
+        boletos = [dict(f) for f in con.execute(
+            f"SELECT id, nombre, fecha, asiento, ruta, destino, precio, vendido "
+            f"FROM boletos {filtro} ORDER BY {campo}, ruta, asiento", params)]
+        por_ruta = [dict(f) for f in con.execute(
+            f"SELECT ruta, COUNT(*) AS boletos, COALESCE(SUM(precio), 0) AS total "
+            f"FROM boletos {filtro} GROUP BY ruta ORDER BY ruta", params)]
+        por_dia = [dict(f) for f in con.execute(
+            f"SELECT {campo} AS dia, COUNT(*) AS boletos, COALESCE(SUM(precio), 0) AS total "
+            f"FROM boletos {filtro} GROUP BY {campo} ORDER BY {campo}", params)]
+    return {
+        "boletos": boletos, "por_ruta": por_ruta, "por_dia": por_dia,
+        "cantidad": len(boletos), "total": sum(b["precio"] or 0 for b in boletos),
+    }
