@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Iniciar sesión{% endblock %}
+{% block contenido %}
+<div class="card" style="max-width:420px;margin:40px auto">
+  <h2 style="text-align:center">Iniciar sesión</h2>
+  <p style="text-align:center;color:#6b7490">Sistema Autobus — Teposcolula</p>
+  <form method="post" style="display:grid;gap:14px;margin-top:16px">
+    <div>
+      <label for="usuario" style="font-weight:600;display:block;margin-bottom:4px">Usuario</label>
+      <input id="usuario" name="usuario" type="text" required autofocus autocomplete="username"
+             style="width:100%;padding:10px;border:1px solid #cdd2e4;border-radius:8px;font-size:1rem">
+    </div>
+    <div>
+      <label for="contrasena" style="font-weight:600;display:block;margin-bottom:4px">Contraseña</label>
+      <input id="contrasena" name="contrasena" type="password" required autocomplete="current-password"
+             style="width:100%;padding:10px;border:1px solid #cdd2e4;border-radius:8px;font-size:1rem">
+    </div>
+    <button class="btn" type="submit">Entrar</button>
+  </form>
+</div>
+{% endblock %}

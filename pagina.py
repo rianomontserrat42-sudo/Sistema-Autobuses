@@ -1,7 +1,8 @@
 import io
 from datetime import date
+from functools import wraps
 
-from flask import Flask, abort, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
@@ -21,7 +22,56 @@ CORTE_ACTIVO = True
 
 @app.context_processor
 def opciones_menu():
-    return {"corte_activo": CORTE_ACTIVO}
+    return {
+        "corte_activo": CORTE_ACTIVO,
+        "sesion_usuario": session.get("usuario"),
+        "sesion_rol": session.get("rol"),
+    }
+
+
+def requiere_login(vista):
+    @wraps(vista)
+    def envoltura(*args, **kwargs):
+        if session.get("usuario") is None:
+            flash("Inicia sesión para entrar al sistema.", "error")
+            return redirect(url_for("login"))
+        return vista(*args, **kwargs)
+    return envoltura
+
+
+def requiere_admin(vista):
+    @wraps(vista)
+    def envoltura(*args, **kwargs):
+        if session.get("rol") != "admin":
+            flash("Solo el administrador puede hacer eso.", "error")
+            return redirect(url_for("boletos"))
+        return vista(*args, **kwargs)
+    return envoltura
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("usuario"):
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        f = basedatos.verificar_usuario(
+            request.form.get("usuario", "").strip(), request.form.get("contrasena", "")
+        )
+        if f is None:
+            flash("Usuario o contraseña incorrectos.", "error")
+        else:
+            session["usuario"] = f["usuario"]
+            session["rol"] = f["rol"]
+            flash(f"Bienvenido, {f['usuario']}.", "ok")
+            return redirect(url_for("index"))
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Sesión cerrada.", "ok")
+    return redirect(url_for("login"))
 
 # Filas del autobús: (izquierda, derecha); None = sin asiento
 FILAS = [((1, 2), (4, 3)), ((5, 6), (8, 7)), ((9, 10), (12, 11)),
@@ -30,11 +80,13 @@ FILAS = [((1, 2), (4, 3)), ((5, 6), (8, 7)), ((9, 10), (12, 11)),
 
 
 @app.route("/")
+@requiere_login
 def index():
     return render_template("index.html")
 
 
 @app.route("/vender", methods=["GET", "POST"])
+@requiere_login
 def vender():
     if request.method == "POST":
         nombre = " ".join(request.form.get("nombre", "").split())
@@ -60,6 +112,7 @@ def vender():
 
 
 @app.route("/ocupados/<fecha>/<ruta>")
+@requiere_login
 def ocupados(fecha, ruta):
     if not validar_fecha(fecha) or ruta not in RUTAS:
         return jsonify([])
@@ -67,6 +120,7 @@ def ocupados(fecha, ruta):
 
 
 @app.route("/editar/<int:boleto_id>", methods=["GET", "POST"])
+@requiere_admin
 def editar(boleto_id):
     boleto = basedatos.obtener(boleto_id)
     if boleto is None:
@@ -95,6 +149,7 @@ def editar(boleto_id):
 
 
 @app.route("/borrar/<int:boleto_id>", methods=["POST"])
+@requiere_login
 def borrar(boleto_id):
     basedatos.borrar(boleto_id)
     flash("Pasajero eliminado.", "ok")
@@ -102,6 +157,7 @@ def borrar(boleto_id):
 
 
 @app.route("/boletos")
+@requiere_login
 def boletos():
     return render_template("boletos.html", boletos=basedatos.listar(), origen=ORIGEN)
 
@@ -109,9 +165,11 @@ def boletos():
 def _parametros_corte():
     """Lee y valida los filtros del corte (día, periodo, base y ruta)."""
     hoy = date.today().isoformat()
-    dia = request.args.get("dia", hoy)
+    # Si no se indica día, mostrar la última fecha de viaje guardada
+    ultimo = basedatos.ultimo_dia_viaje()
+    dia = request.args.get("dia", "")
     if not validar_fecha(dia):
-        dia = hoy
+        dia = ultimo
     campo = request.args.get("base", "vendido")
     if campo not in CAMPOS_CORTE:
         campo = "vendido"
@@ -130,6 +188,7 @@ def _parametros_corte():
 
 
 @app.route("/corte")
+@requiere_admin
 def corte():
     if not CORTE_ACTIVO:
         abort(404)
@@ -137,18 +196,19 @@ def corte():
     return render_template(
         "corte.html", origen=ORIGEN, dia=dia, desde=desde, hasta=hasta, hoy=hoy,
         campo=campo, campos=CAMPOS_CORTE, ruta=ruta, rutas=RUTAS,
-        corte_dia=basedatos.corte(dia, dia, "vendido", ruta),
+        corte_dia=basedatos.corte(dia, dia, "fecha", ruta),
         corte_periodo=basedatos.corte(desde, hasta, campo, ruta),
     )
 
 
 @app.route("/corte/pdf")
+@requiere_admin
 def corte_pdf():
     if not CORTE_ACTIVO:
         abort(404)
     hoy, dia, desde, hasta, campo, ruta = _parametros_corte()
     if request.args.get("tipo") == "dia":
-        titulo, ini, fin, base = f"Corte de caja del día {dia}", dia, dia, "vendido"
+        titulo, ini, fin, base = f"Corte de caja del día {dia}", dia, dia, "fecha"
     else:
         titulo, ini, fin, base = f"Corte de caja del {desde} al {hasta}", desde, hasta, campo
     datos = basedatos.corte(ini, fin, base, ruta)

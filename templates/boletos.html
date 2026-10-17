@@ -9,11 +9,18 @@
     {% for b in boletos %}
     <tr><td>{{ b.nombre }}</td><td>{{ origen }} → {{ b.destino }} <small style="color:#6b7490">(ruta {{ b.ruta }})</small></td><td>{{ b.fecha }}</td><td><span class="asiento-tag">{{ '%02d'|format(b.asiento) }}</span></td><td>${{ b.precio }}</td>
       <td style="white-space:nowrap">
+        {% if sesion_rol == 'admin' %}
         <a class="acc editar" href="{{ url_for('editar', boleto_id=b.id) }}">Editar</a>
         <form method="post" action="{{ url_for('borrar', boleto_id=b.id) }}" style="display:inline"
               onsubmit="return confirm('¿Eliminar a {{ b.nombre }} (asiento {{ b.asiento }})?')">
           <button class="acc borrar" type="submit">Borrar</button>
         </form>
+        {% else %}
+        <form method="post" action="{{ url_for('borrar', boleto_id=b.id) }}" style="display:inline"
+              onsubmit="return confirm('¿Cancelar el boleto de {{ b.nombre }} (asiento {{ b.asiento }})?')">
+          <button class="acc borrar" type="submit">Cancelar</button>
+        </form>
+        {% endif %}
       </td></tr>
     {% else %}
     <tr><td colspan="6">Aún no hay boletos vendidos.</td></tr>

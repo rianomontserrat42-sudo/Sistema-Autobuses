@@ -32,12 +32,13 @@
 {% endmacro %}
 
 <div class="card">
-  <h2>Corte de caja del día</h2>
+  <h2>Corte de caja del día {{ dia }}</h2>
+  <p style="color:#6b7490;margin-top:-8px">Boletos cuyo viaje es el {{ dia }}.</p>
   <form method="get" class="filtros">
     <input type="hidden" name="desde" value="{{ desde }}">
     <input type="hidden" name="hasta" value="{{ hasta }}">
     <input type="hidden" name="base" value="{{ campo }}">
-    <div><label for="dia">Día (boletos vendidos ese día)</label><input id="dia" type="date" name="dia" value="{{ dia }}"></div>
+    <div><label for="dia">Fecha del viaje</label><input id="dia" type="date" name="dia" value="{{ dia }}"></div>
     {{ selector_ruta() }}
     <button class="btn" type="submit">Ver corte</button>
     <a class="btn" href="{{ url_for('corte_pdf', tipo='dia', dia=dia, desde=desde, hasta=hasta, base=campo, ruta=ruta) }}">Exportar PDF</a>

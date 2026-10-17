@@ -2,6 +2,8 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
+from werkzeug.security import check_password_hash, generate_password_hash
+
 DB = Path(__file__).with_name("autobus.db")
 TOTAL_ASIENTOS = 30
 ORIGEN = "Teposcolula"
@@ -66,6 +68,29 @@ def iniciar():
         con.execute("UPDATE boletos SET ruta = 'Tlaxiaco' WHERE ruta IS NULL AND destino = 'Yolo'")
         con.execute("UPDATE boletos SET ruta = destino WHERE ruta IS NULL")
         _migrar_unicidad_por_ruta(con)
+        _crear_usuarios(con)
+
+
+def _crear_usuarios(con):
+    """Crea la tabla de usuarios y las cuentas iniciales si no existen."""
+    con.execute(
+        """CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT NOT NULL UNIQUE,
+            contrasena TEXT NOT NULL,
+            rol TEXT NOT NULL CHECK (rol IN ('admin', 'usuario'))
+        )"""
+    )
+    iniciales = [
+        ("admin", "admin123", "admin"),
+        ("usuario", "usuario123", "usuario"),
+    ]
+    for nombre, contrasena, rol in iniciales:
+        if con.execute("SELECT 1 FROM usuarios WHERE usuario = ?", (nombre,)).fetchone() is None:
+            con.execute(
+                "INSERT INTO usuarios (usuario, contrasena, rol) VALUES (?, ?, ?)",
+                (nombre, generate_password_hash(contrasena), rol),
+            )
 
 
 def _migrar_unicidad_por_ruta(con):
@@ -175,3 +200,21 @@ def corte(desde, hasta, campo="vendido", ruta=""):
         "boletos": boletos, "por_ruta": por_ruta, "por_dia": por_dia,
         "cantidad": len(boletos), "total": sum(b["precio"] or 0 for b in boletos),
     }
+
+
+def verificar_usuario(nombre, contrasena):
+    """Devuelve la fila del usuario si el usuario y contraseña son correctos; None si no."""
+    if not nombre or not contrasena:
+        return None
+    with conectar() as con:
+        f = con.execute("SELECT * FROM usuarios WHERE usuario = ?", (nombre,)).fetchone()
+    if f is not None and check_password_hash(f["contrasena"], contrasena):
+        return f
+    return None
+
+
+def ultimo_dia_viaje():
+    """Última fecha de viaje guardada (hoy si no hay boletos)."""
+    with conectar() as con:
+        f = con.execute("SELECT MAX(fecha) AS dia FROM boletos").fetchone()
+    return f["dia"] or date.today().isoformat()
