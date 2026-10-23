@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Usuarios{% endblock %}
+{% block contenido %}
+<div class="card">
+  <h2>Registrar nuevo usuario</h2>
+  <form method="post" action="{{ url_for('usuarios_nuevo') }}" class="filtros" style="margin-top:16px">
+    <div>
+      <label for="usuario">Usuario</label>
+      <input id="usuario" name="usuario" type="text" required autocomplete="off">
+    </div>
+    <div>
+      <label for="contrasena">Contraseña</label>
+      <input id="contrasena" name="contrasena" type="text" required autocomplete="off">
+    </div>
+    <div>
+      <label for="rol">Rol</label>
+      <select id="rol" name="rol" required>
+        <option value="usuario">Usuario (solo vender y cancelar)</option>
+        <option value="admin">Administrador (todo)</option>
+      </select>
+    </div>
+    <button class="btn" type="submit">Guardar usuario</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Usuarios registrados</h2>
+  <table>
+    <thead><tr><th>Usuario</th><th>Rol</th><th style="text-align:right">Acciones</th></tr></thead>
+    <tbody>
+    {% for u in usuarios %}
+    <tr>
+      <td>{{ u.usuario }}</td>
+      <td>{{ 'Administrador' if u.rol == 'admin' else 'Usuario' }}</td>
+      <td style="text-align:right">
+        {% if u.rol != 'admin' %}
+        <form method="post" action="{{ url_for('usuarios_borrar', usuario_id=u.id) }}" style="display:inline"
+              onsubmit="return confirm('¿Eliminar al usuario {{ u.usuario }}?')">
+          <button class="acc borrar" type="submit">Eliminar</button>
+        </form>
+        {% else %}
+        <span style="color:#6b7490">Principal</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3">No hay usuarios.</td></tr>
+    {% endfor %}
+    </tbody>
+  <table>
+</div>
+{% endblock %}

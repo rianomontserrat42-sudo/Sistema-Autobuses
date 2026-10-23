@@ -213,6 +213,36 @@ def verificar_usuario(nombre, contrasena):
     return None
 
 
+def usuario_existe(nombre):
+    with conectar() as con:
+        return con.execute("SELECT 1 FROM usuarios WHERE usuario = ?", (nombre,)).fetchone() is not None
+
+
+def listar_usuarios():
+    with conectar() as con:
+        return [dict(f) for f in con.execute("SELECT id, usuario, rol FROM usuarios ORDER BY usuario")]
+
+
+def crear_usuario(nombre, contrasena, rol):
+    """Crea un usuario nuevo. Devuelve True si se creó; False si ya existía o el rol es inválido."""
+    if rol not in ("admin", "usuario") or not nombre or not contrasena:
+        return False
+    try:
+        with conectar() as con:
+            con.execute(
+                "INSERT INTO usuarios (usuario, contrasena, rol) VALUES (?, ?, ?)",
+                (nombre.strip(), generate_password_hash(contrasena), rol),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def eliminar_usuario(usuario_id):
+    with conectar() as con:
+        con.execute("DELETE FROM usuarios WHERE id = ? AND rol != 'admin'", (usuario_id,))
+
+
 def ultimo_dia_viaje():
     """Última fecha de viaje guardada (hoy si no hay boletos)."""
     with conectar() as con:

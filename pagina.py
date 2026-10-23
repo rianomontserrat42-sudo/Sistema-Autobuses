@@ -162,6 +162,37 @@ def boletos():
     return render_template("boletos.html", boletos=basedatos.listar(), origen=ORIGEN)
 
 
+@app.route("/usuarios")
+@requiere_admin
+def usuarios():
+    return render_template("usuarios.html", usuarios=basedatos.listar_usuarios())
+
+
+@app.route("/usuarios/nuevo", methods=["POST"])
+@requiere_admin
+def usuarios_nuevo():
+    nombre = request.form.get("usuario", "").strip()
+    contrasena = request.form.get("contrasena", "")
+    rol = request.form.get("rol", "")
+    if not nombre or not contrasena:
+        flash("Escribe usuario y contraseña.", "error")
+    elif rol not in ("admin", "usuario"):
+        flash("Selecciona un rol válido.", "error")
+    elif basedatos.crear_usuario(nombre, contrasena, rol):
+        flash(f"Usuario '{nombre}' creado como {rol}.", "ok")
+    else:
+        flash(f"El usuario '{nombre}' ya existe.", "error")
+    return redirect(url_for("usuarios"))
+
+
+@app.route("/usuarios/borrar/<int:usuario_id>", methods=["POST"])
+@requiere_admin
+def usuarios_borrar(usuario_id):
+    basedatos.eliminar_usuario(usuario_id)
+    flash("Usuario eliminado.", "ok")
+    return redirect(url_for("usuarios"))
+
+
 def _parametros_corte():
     """Lee y valida los filtros del corte (día, periodo, base y ruta)."""
     hoy = date.today().isoformat()

@@ -35,6 +35,7 @@
   <a href="{{ url_for('vender') }}" class="{{ 'activo' if request.endpoint=='vender' }}">Vender boletos</a>
   <a href="{{ url_for('boletos') }}" class="{{ 'activo' if request.endpoint=='boletos' }}">Boletos vendidos</a>
   {% if corte_activo and sesion_rol == 'admin' %}<a href="{{ url_for('corte') }}" class="{{ 'activo' if request.endpoint=='corte' }}">Corte de caja</a>{% endif %}
+  {% if sesion_rol == 'admin' %}<a href="{{ url_for('usuarios') }}" class="{{ 'activo' if request.endpoint=='usuarios' }}">Usuarios</a>{% endif %}
   <span style="margin-left:auto;color:#4b5675;font-size:.9rem;align-self:center">
     {{ sesion_usuario }} · {{ 'Administrador' if sesion_rol == 'admin' else 'Usuario' }}
   </span>
